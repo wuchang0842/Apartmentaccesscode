@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Apartment Access Codes</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+*{box-sizing:border-box} body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#f5f6f8;color:#1d1d1f}
+header{background:#111827;color:white;padding:20px 16px 16px;position:sticky;top:0;z-index:1000}
+h1{font-size:22px;margin:0 0 12px}.sub{font-size:13px;opacity:.75}
+.controls{display:flex;gap:8px;margin-top:14px}.controls button,.controls select{border:0;border-radius:12px;padding:11px 13px;font-size:14px;font-weight:600}
+#locate{background:#fff;color:#111827;flex:1} #mapBtn{background:#374151;color:white}
+main{max-width:720px;margin:auto;padding:12px}
+.search-wrap{position:relative;margin-bottom:10px;z-index:1100}
+.search{width:100%;padding:13px 15px;border:1px solid #ddd;border-radius:13px;font-size:16px;margin:0;background:white}
+.suggestions{position:absolute;left:0;right:0;top:calc(100% + 5px);background:white;border:1px solid #ddd;border-radius:13px;box-shadow:0 8px 25px #0000001a;overflow:hidden;display:none;max-height:55vh;overflow-y:auto}
+.suggestion{padding:12px 14px;border-bottom:1px solid #eee;cursor:pointer}
+.suggestion:last-child{border-bottom:0}.suggestion:active{background:#f2f2f2}
+.s-title{font-size:15px;font-weight:650}.s-code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px;color:#666;margin-top:3px}
+.s-area{font-size:11px;color:#999;margin-top:2px}
+#status{font-size:13px;color:#666;padding:6px 2px}
+.card{background:white;border-radius:16px;padding:15px;margin:9px 0;box-shadow:0 1px 5px #0000000d}
+.addr{font-size:16px;font-weight:650}.area{font-size:12px;color:#777;margin-top:3px}
+.row{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:12px}
+.code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:18px;font-weight:700;letter-spacing:.4px;filter:blur(7px);transition:.15s}
+.code.show{filter:none}.actions{display:flex;gap:7px}.actions button{border:0;border-radius:10px;padding:9px 11px;font-weight:600}
+.view{background:#111827;color:white}.copy{background:#e5e7eb}.distance{font-size:12px;color:#666;margin-top:8px}
+#map{height:55vh;border-radius:16px;margin-top:10px;display:none;position:relative;z-index:1}
+.warning{background:#fff7ed;color:#9a3412;padding:11px;border-radius:12px;font-size:12px;margin:8px 0}
+</style>
+</head>
+<body>
+<header>
+<h1>🏢 Apartment Access Codes</h1>
+<div class="sub">Brunswick & Brunswick East · tap an address to reveal the code</div>
+<div class="controls">
+<button id="locate">📍 Find nearby</button>
+<button id="mapBtn">🗺️ Map</button>
+</div>
+</header>
+<main>
+<div class="warning">Access codes are sensitive. Share this page only with trusted colleagues.</div>
+<div class="search-wrap">
+<input id="search" class="search" placeholder="Search address or code…" autocomplete="off">
+<div id="suggestions" class="suggestions"></div>
+</div>
+<div id="status">Loading apartments…</div>
+<div id="map"></div>
+<div id="list"></div>
+</main>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const places=[
+["10 Donald Street, Brunswick VIC 3056","2511","Brunswick"],
+["10 Pottery Court, Brunswick VIC 3056","6415","Brunswick"],
+["100 Blyth Street, Brunswick VIC 3056","2789","Brunswick"],
+["12-32 Lux Way, Brunswick VIC 3056","Key2306","Brunswick"],
+["15 Showers Street, Brunswick VIC 3056","#201001#","Brunswick"],
+["2-6 Duckett Street, Brunswick VIC 3056","#2680#","Brunswick"],
+["2 Black Street, Brunswick VIC 3056","Bell8116bell","Brunswick"],
+["212 Albion Street, Brunswick VIC 3056","742579#","Brunswick"],
+["285 Brunswick Road, Brunswick VIC 3056","14580","Brunswick"],
+["287 Brunswick Road, Brunswick VIC 3056","#1206","Brunswick"],
+["394 Lygon Street, Brunswick VIC 3056","#3944#","Brunswick"],
+["40-52 Percy Street, Brunswick VIC 3056","key0491","Brunswick"],
+["4 Saxon Street, Brunswick VIC 3056","2608","Brunswick"],
+["54-84 Percy Street, Brunswick VIC 3056","key9184","Brunswick"],
+["553 Murray Road, Brunswick VIC 3056","5300","Brunswick"],
+["6 Black Street, Brunswick VIC 3056","8047#","Brunswick"],
+["690 High Street, Brunswick VIC 3056","1937","Brunswick"],
+["7 Colebrook Street, Brunswick VIC 3056","key2105","Brunswick"],
+["74 De Carle Street, Brunswick VIC 3056","o,0852","Brunswick"],
+["767 High Street, Brunswick VIC 3056","#2204","Brunswick"],
+["8-38 Percy Street, Brunswick VIC 3056","key2794","Brunswick"],
+["116 Albert Street, Brunswick East VIC 3057","#1874","Brunswick East"],
+["133 Nicholson Street, Brunswick East VIC 3057","#1111","Brunswick East"],
+["162-164 Lygon Street, Brunswick East VIC 3057","483164","Brunswick East"],
+["240-250 Lygon Street, Brunswick East VIC 3057","#888888#","Brunswick East"],
+["269 Stewart Street, Brunswick East VIC 3057","#269269","Brunswick East"],
+["38 Hutchinson Street, Brunswick East VIC 3057","22106","Brunswick East"],
+["455 Lygon Street, Brunswick East VIC 3057","#9648","Brunswick East"],
+["791-793 Park Street, Brunswick East VIC 3057","5690","Brunswick East"],
+["9 Holmes Street, Brunswick East VIC 3057","2580","Brunswick East"]
+];
+let coords=[], userPos=null, map, markers=[];
+const list=document.getElementById("list"), status=document.getElementById("status"), search=document.getElementById("search"), suggestions=document.getElementById("suggestions");
+
+function esc(s){return s.replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
+function dist(a,b){const R=6371,dLat=(b.lat-a.lat)*Math.PI/180,dLon=(b.lng-a.lng)*Math.PI/180;
+const x=Math.sin(dLat/2)**2+Math.cos(a.lat*Math.PI/180)*Math.cos(b.lat*Math.PI/180)*Math.sin(dLon/2)**2;
+return R*2*Math.atan2(Math.sqrt(x),Math.sqrt(1-x))}
+function getResults(){
+let q=search.value.trim().toLowerCase();
+let arr=places.map((p,i)=>({p,i,d:coords[i]&&userPos?dist(userPos,coords[i]):null}))
+.filter(x=>!q || x.p[0].toLowerCase().includes(q)||x.p[1].toLowerCase().includes(q));
+arr.sort((a,b)=>(a.d??9999)-(b.d??9999));
+return arr;
+}
+function renderSuggestions(arr){
+let q=search.value.trim();
+if(!q){suggestions.style.display="none";suggestions.innerHTML="";return;}
+let top=arr.slice(0,8);
+suggestions.innerHTML=top.length ? top.map(x=>`<div class="suggestion" onclick="selectSuggestion(${x.i})">
+<div class="s-title">📍 ${esc(x.p[0])}</div>
+<div class="s-code">🔐 ${esc(x.p[1])}</div>
+<div class="s-area">${esc(x.p[2])}</div>
+</div>`).join("") : '<div class="suggestion"><div class="s-title">No matching apartments</div></div>';
+suggestions.style.display="block";
+}
+function selectSuggestion(i){
+search.value=places[i][0];
+suggestions.style.display="none";
+render();
+document.getElementById("c"+i)?.scrollIntoView({behavior:"smooth",block:"center"});
+}
+function render(){
+let arr=getResults();
+renderSuggestions(arr);
+list.innerHTML=arr.map(x=>`<div class="card">
+<div class="addr">${esc(x.p[0])}</div><div class="area">${esc(x.p[2])}</div>
+<div class="row"><span class="code" id="c${x.i}">${esc(x.p[1])}</span>
+<div class="actions"><button class="view" onclick="toggle(${x.i})">View</button><button class="copy" onclick="copyCode(${x.i})">Copy</button></div></div>
+${x.d!==null?`<div class="distance">${x.d<1?(x.d*1000).toFixed(0)+" m":x.d.toFixed(1)+" km"} away</div>`:""}
+</div>`).join("");
+status.textContent=arr.length+" apartments";
+}
+function toggle(i){document.getElementById("c"+i).classList.toggle("show")}
+async function copyCode(i){await navigator.clipboard.writeText(places[i][1]);status.textContent="Access code copied ✓";setTimeout(render,1500)}
+async function geocode(i){
+try{
+const q=encodeURIComponent(places[i][0]);
+const r=await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=au&q=${q}`,{headers:{Accept:"application/json"}});
+const j=await r.json(); if(j[0]) coords[i]={lat:+j[0].lat,lng:+j[0].lon};
+}catch(e){}
+}
+async function loadCoords(){
+status.textContent="Finding apartment locations…";
+for(let i=0;i<places.length;i+=4) await Promise.all([0,1,2,3].map(k=>i+k<places.length?geocode(i+k):Promise.resolve()));
+render(); status.textContent=places.length+" apartments · locations ready";
+}
+document.getElementById("locate").onclick=()=>{
+if(!navigator.geolocation){status.textContent="Location is not supported by this browser.";return}
+status.textContent="Getting your location…";
+navigator.geolocation.getCurrentPosition(p=>{userPos={lat:p.coords.latitude,lng:p.coords.longitude};render();showMap();status.textContent="Sorted by distance from your location";},e=>{status.textContent="Please allow location access in your browser.";},{enableHighAccuracy:true,timeout:10000});
+};
+function showMap(){
+const el=document.getElementById("map");el.style.display="block";
+if(!map)map=L.map("map").setView([ -37.77,144.96],13);
+L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{attribution:"© OpenStreetMap contributors"}).addTo(map);
+markers.forEach(m=>m.remove());markers=[];
+if(userPos) markers.push(L.marker(userPos).addTo(map).bindPopup("📍 You are here"));
+coords.forEach((c,i)=>{if(c)markers.push(L.marker(c).addTo(map).bindPopup(`<b>${esc(places[i][0])}</b><br><span style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:18px;font-weight:700;">🔐 ${esc(places[i][1])}</span>`))});
+if(userPos)map.setView(userPos,14);
+setTimeout(()=>map.invalidateSize(),100);
+}
+document.getElementById("mapBtn").onclick=showMap;
+search.oninput=render;
+search.onfocus=()=>{if(search.value.trim()) renderSuggestions(getResults())};
+document.addEventListener("click",e=>{if(!e.target.closest(".search-wrap")) suggestions.style.display="none"});
+render();loadCoords();
+</script>
+</body>
+</html>
