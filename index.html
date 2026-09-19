@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Apartment Access Codes</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+*{box-sizing:border-box} body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#f5f6f8;color:#1d1d1f}
+header{background:#111827;color:white;padding:20px 16px 16px;position:sticky;top:0;z-index:1000}
+h1{font-size:22px;margin:0 0 12px}.sub{font-size:13px;opacity:.75}
+.controls{display:flex;gap:8px;margin-top:14px}.controls button,.controls select{border:0;border-radius:12px;padding:11px 13px;font-size:14px;font-weight:600}
+#locate{background:#fff;color:#111827;flex:1} #mapBtn{background:#374151;color:white}
+main{max-width:720px;margin:auto;padding:12px}
+.search{width:100%;padding:13px 15px;border:1px solid #ddd;border-radius:13px;font-size:16px;margin-bottom:10px}
+#status{font-size:13px;color:#666;padding:6px 2px}
+.card{background:white;border-radius:16px;padding:15px;margin:9px 0;box-shadow:0 1px 5px #0000000d}
+.addr{font-size:16px;font-weight:650}.area{font-size:12px;color:#777;margin-top:3px}
+.row{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:12px}
+.code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:18px;font-weight:700;letter-spacing:.4px;filter:blur(7px);transition:.15s}
+.code.show{filter:none}.actions{display:flex;gap:7px}.actions button{border:0;border-radius:10px;padding:9px 11px;font-weight:600}
+.view{background:#111827;color:white}.copy{background:#e5e7eb}.distance{font-size:12px;color:#666;margin-top:8px}
+#map{height:55vh;border-radius:16px;margin-top:10px;display:none}
+.warning{background:#fff7ed;color:#9a3412;padding:11px;border-radius:12px;font-size:12px;margin:8px 0}
+</style>
+</head>
+<body>
+<header>
+<h1>🏢 Apartment Access Codes</h1>
+<div class="sub">Brunswick & Brunswick East · tap an address to reveal the code</div>
+<div class="controls">
+<button id="locate">📍 Find nearby</button>
+<button id="mapBtn">🗺️ Map</button>
+</div>
+</header>
+<main>
+<div class="warning">Access codes are sensitive. Share this page only with trusted colleagues.</div>
+<input id="search" class="search" placeholder="Search address or code…">
+<div id="status">Loading apartments…</div>
+<div id="map"></div>
+<div id="list"></div>
+</main>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const places=[["14 Irvine Crescent, Brunswick West VIC 3055","","Brunswick West"],["15-17 De Carle Street, Coburg VIC 3058","","Coburg"],["183 Moreland Road, Brunswick VIC 3056","","Coburg / Brunswick"],["23 Baxter Street, Coburg VIC 3058","","Coburg"],["37-41 Munro Street, Coburg VIC 3058","","Coburg"],["5 Industry Lane, Coburg VIC 3058","","Coburg"],["56 Sydney Road, Coburg VIC 3058","","Coburg"],["6 Industry Lane, Coburg VIC 3058","","Coburg"],["150 Station Street, Carlton VIC 3053","","Carlton"],["188 Faraday Street, Carlton VIC 3053","","Carlton"],["22-26 Grattan Street, Carlton VIC 3053","","Carlton"],["255 Cardigan Street, Carlton VIC 3053","","Carlton"],["259-277 Nicholson Street, Carlton VIC 3053","","Carlton"],["371 Drummond Street, Carlton VIC 3053","","Carlton"],["404 Cardigan Street, Carlton VIC 3053","","Carlton"],["93 Pelham Street, Carlton VIC 3053","","Carlton"],["767 Nicholson Street, Carlton North VIC 3054","","Carlton North"],["1 James Street, Fitzroy VIC 3065","","Fitzroy"],["113 Cecil Street, Fitzroy VIC 3065","","Fitzroy"],["143-149 Kerr Street, Fitzroy VIC 3065","","Fitzroy"],["166 Gertrude Street, Fitzroy VIC 3065","","Fitzroy"],["185 Rose Street, Fitzroy VIC 3065","","Fitzroy"],["205 Johnston Street, Fitzroy VIC 3065","","Fitzroy"],["220 Johnson Street, Fitzroy VIC 3065","","Fitzroy"],["226-228 Moor Street, Fitzroy VIC 3065","","Fitzroy"],["26 Victoria Street, Fitzroy VIC 3065","","Fitzroy"],["385 Gore Street, Fitzroy VIC 3065","","Fitzroy"],["424 Gore Street, Fitzroy VIC 3065","","Fitzroy"],["59 Young Street, Fitzroy VIC 3065","","Fitzroy"],["59 Moore Street, Fitzroy VIC 3065","","Fitzroy"],["81 Argyle Street, Fitzroy VIC 3065","","Fitzroy"],["82 Wesgarth Street, Fitzroy VIC 3065","","Fitzroy"],["135 Rae Street, Fitzroy North VIC 3068","","Fitzroy North"],["16 Nicholson Street, Fitzroy North VIC 3068","","Fitzroy North"],["247 McKean Street, Fitzroy North VIC 3068","","Fitzroy North"],["42 Barkly Street, Fitzroy North VIC 3068","","Fitzroy North"],["16-24 Box Forest Road, Glenroy VIC 3046","","Glenroy"],["40 Chetwynd Grove, Wollert VIC 3750","","Wollert"],["2 Fortitude Drive, Craigieburn VIC 3064","","Craigieburn"],["14 Irvine Crescent, Brunswick West VIC 3055","","Brunswick West"],["15-17 De Carle Street, Coburg VIC 3058","","Coburg"],["183 Moreland Road, Brunswick VIC 3056","","Coburg / Brunswick"],["23 Baxter Street, Coburg VIC 3058","","Coburg"],["37-41 Munro Street, Coburg VIC 3058","","Coburg"],["5 Industry Lane, Coburg VIC 3058","","Coburg"],["56 Sydney Road, Coburg VIC 3058","","Coburg"],["6 Industry Lane, Coburg VIC 3058","","Coburg"],["150 Station Street, Carlton VIC 3053","","Carlton"],["188 Faraday Street, Carlton VIC 3053","","Carlton"],["22-26 Grattan Street, Carlton VIC 3053","","Carlton"],["255 Cardigan Street, Carlton VIC 3053","","Carlton"],["259-277 Nicholson Street, Carlton VIC 3053","","Carlton"],["371 Drummond Street, Carlton VIC 3053","","Carlton"],["404 Cardigan Street, Carlton VIC 3053","","Carlton"],["93 Pelham Street, Carlton VIC 3053","","Carlton"],["767 Nicholson Street, Carlton North VIC 3054","","Carlton North"],["1 James Street, Fitzroy VIC 3065","","Fitzroy"],["113 Cecil Street, Fitzroy VIC 3065","","Fitzroy"],["143-149 Kerr Street, Fitzroy VIC 3065","","Fitzroy"],["166 Gertrude Street, Fitzroy VIC 3065","","Fitzroy"],["185 Rose Street, Fitzroy VIC 3065","","Fitzroy"],["205 Johnston Street, Fitzroy VIC 3065","","Fitzroy"],["220 Johnson Street, Fitzroy VIC 3065","","Fitzroy"],["226-228 Moor Street, Fitzroy VIC 3065","","Fitzroy"],["26 Victoria Street, Fitzroy VIC 3065","","Fitzroy"],["385 Gore Street, Fitzroy VIC 3065","","Fitzroy"],["424 Gore Street, Fitzroy VIC 3065","","Fitzroy"],["59 Young Street, Fitzroy VIC 3065","","Fitzroy"],["59 Moore Street, Fitzroy VIC 3065","","Fitzroy"],["81 Argyle Street, Fitzroy VIC 3065","","Fitzroy"],["82 Wesgarth Street, Fitzroy VIC 3065","","Fitzroy"],["135 Rae Street, Fitzroy North VIC 3068","","Fitzroy North"],["16 Nicholson Street, Fitzroy North VIC 3068","","Fitzroy North"],["247 McKean Street, Fitzroy North VIC 3068","","Fitzroy North"],["42 Barkly Street, Fitzroy North VIC 3068","","Fitzroy North"],["16-24 Box Forest Road, Glenroy VIC 3046","","Glenroy"],["40 Chetwynd Grove, Wollert VIC 3750","","Wollert"],["2 Fortitude Drive, Craigieburn VIC 3064","","Craigieburn"]];
+let coords=[], userPos=null, map, markers=[];
+const list=document.getElementById("list"), status=document.getElementById("status"), search=document.getElementById("search");
+
+function esc(s){return s.replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
+function dist(a,b){const R=6371,dLat=(b.lat-a.lat)*Math.PI/180,dLon=(b.lng-a.lng)*Math.PI/180;
+const x=Math.sin(dLat/2)**2+Math.cos(a.lat*Math.PI/180)*Math.cos(b.lat*Math.PI/180)*Math.sin(dLon/2)**2;
+return R*2*Math.atan2(Math.sqrt(x),Math.sqrt(1-x))}
+function render(){
+let q=search.value.toLowerCase();
+let arr=places.map((p,i)=>({p,i,d:coords[i]&&userPos?dist(userPos,coords[i]):null}))
+.filter(x=>x.p[0].toLowerCase().includes(q)||x.p[1].toLowerCase().includes(q));
+arr.sort((a,b)=>(a.d??9999)-(b.d??9999));
+list.innerHTML=arr.map(x=>`<div class="card">
+<div class="addr">${esc(x.p[0])}</div><div class="area">${esc(x.p[2])}</div>
+<div class="row"><span class="code" id="c${x.i}">${esc(x.p[1])}</span>
+<div class="actions"><button class="view" onclick="toggle(${x.i})">View</button><button class="copy" onclick="copyCode(${x.i})">Copy</button></div></div>
+${x.d!==null?`<div class="distance">${x.d<1?(x.d*1000).toFixed(0)+" m":x.d.toFixed(1)+" km"} away</div>`:""}
+</div>`).join("");
+status.textContent=arr.length+" apartments";
+}
+function toggle(i){document.getElementById("c"+i).classList.toggle("show")}
+async function copyCode(i){await navigator.clipboard.writeText(places[i][1]);status.textContent="Access code copied ✓";setTimeout(render,1500)}
+async function geocode(i){
+try{
+const q=encodeURIComponent(places[i][0]);
+const r=await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=au&q=${q}`,{headers:{Accept:"application/json"}});
+const j=await r.json(); if(j[0]) coords[i]={lat:+j[0].lat,lng:+j[0].lon};
+}catch(e){}
+}
+async function loadCoords(){
+status.textContent="Finding apartment locations…";
+for(let i=0;i<places.length;i+=4) await Promise.all([0,1,2,3].map(k=>i+k<places.length?geocode(i+k):Promise.resolve()));
+render(); status.textContent=places.length+" apartments · locations ready";
+}
+document.getElementById("locate").onclick=()=>{
+if(!navigator.geolocation){status.textContent="Location is not supported by this browser.";return}
+status.textContent="Getting your location…";
+navigator.geolocation.getCurrentPosition(p=>{userPos={lat:p.coords.latitude,lng:p.coords.longitude};render();showMap();status.textContent="Sorted by distance from your location";},e=>{status.textContent="Please allow location access in your browser.";},{enableHighAccuracy:true,timeout:10000});
+};
+function showMap(){
+const el=document.getElementById("map");el.style.display="block";
+if(!map)map=L.map("map").setView([ -37.77,144.96],13);
+L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{attribution:"© OpenStreetMap contributors"}).addTo(map);
+markers.forEach(m=>m.remove());markers=[];
+if(userPos) markers.push(L.marker(userPos).addTo(map).bindPopup("📍 You are here"));
+coords.forEach((c,i)=>{if(c)markers.push(L.marker(c).addTo(map).bindPopup(`<b>${esc(places[i][0])}</b><br><span style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:18px;font-weight:700;">🔐 ${esc(places[i][1])}</span>`))});
+if(userPos)map.setView(userPos,14);
+setTimeout(()=>map.invalidateSize(),100);
+}
+document.getElementById("mapBtn").onclick=showMap;
+search.oninput=render;
+render();loadCoords();
+</script>
+</body>
+</html>
